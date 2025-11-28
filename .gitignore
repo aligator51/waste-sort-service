@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+.env/
+
+# Ultralytics/YOLO
+runs/
+*.pt
+*.onnx
+*.engine
+
+# Data
+data/
+TACO/
+datasets/
+helpers/
+*.zip
+annotations.json
+
+# Cache
+*.cache
+*.log
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# JetBrains / VSCode
+.idea/
+.vscode/
+*.iml

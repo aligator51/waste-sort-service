@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YOLOv8 Web UI</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, Arial;
+      background: #0e1014;
+      color: #e8ecf3;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .tab {
+      padding: 8px 12px;
+      border: 1px solid #2b3242;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: #171a21;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #171a21;
+      border-radius: 10px;
+      padding: 15px;
+    }
+
+    .stage {
+      position: relative;
+
+      background: #0b0e13;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    img,
+    video,
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    canvas.overlay {
+      position: absolute;
+      inset: 0;
+    }
+
+    input,
+    button,
+    select {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #2b3242;
+      background: #0c0f14;
+      color: #cfd5e7;
+    }
+
+    button {
+      background: #4f8cff;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    dialog {
+      border: none;
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 420px;
+      width: 100%;
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.35);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="row">
+      <h1>YOLOv8 Web UI</h1>
+      <button id="btnSettings">⚙️ Настройки</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="image">Фото</div>
+      <div class="tab" data-tab="video">Видео</div>
+      <div class="tab" data-tab="screen">Экран</div>
+
+    </div>
+
+    <!-- Фото -->
+    <div class="grid panel tabpanel" id="panel-image" style="display:grid;">
+      <div class="panel">
+        <h2>Результат</h2>
+        <div class="stage">
+          <img id="imgPreview" alt="">
+          <canvas id="canvasImg" class="overlay"></canvas>
+        </div>
+        <div id="listImg" style="margin-top:10px; font-size:13px;"></div>
+      </div>
+      <!-- было 2 панели (Параметры + Загрузка). Делаем одну: -->
+      <div class="panel" style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <h2>Параметры запуска</h2>
+          <div id="runParamsImage" style="font-family:ui-monospace,monospace; font-size:13px; line-height:1.5"></div>
+          <button id="btnRefreshParamsImg" style="margin-top:8px;">Обновить</button>
+        </div>
+        <hr style="border-color:#2b3242;">
+        <div>
+          <h2>Загрузка</h2>
+          <input type="file" id="fileImg" accept="image/*"><br>
+          <button id="btnDetectImg" disabled>Обработать</button>
+          <button id="btnClearImg">Очистить</button><br>
+          <label>API <input type="text" id="apiUrlImg" style="width:100%" value="/api/yolo/detect"></label>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Видео -->
+    <div class="grid panel tabpanel" id="panel-video" style="display:none;">
+      <div class="panel">
+        <h2>Веб-камера</h2>
+        <div class="row" style="gap:8px;">
+          <button id="btnCamStart">Старт</button>
+          <button id="btnCamStop">Стоп</button>
+        </div>
+        <div class="row" style="gap:16px; margin-top:8px;">
+          <video id="cam" autoplay muted playsinline width="480"></video>
+          <canvas id="camCanvas" width="480" height="360"></canvas>
+        </div>
+      </div>
+      <!-- справа единый сайдбар -->
+      <div class="panel" style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <h2>Параметры запуска</h2>
+          <div id="runParamsVideo" style="font-family:ui-monospace,monospace; font-size:13px; line-height:1.5"></div>
+          <button id="btnRefreshParamsVid" style="margin-top:8px;">Обновить</button>
+        </div>
+        <hr style="border-color:#2b3242;">
+        <div>
+          <h2>Видео-файл</h2>
+          <input type="file" id="videoFile" accept="video/*"><br>
+          <button id="btnProcessVideo">Обработать файл</button>
+          <div style="margin-top:10px;">
+            <progress id="videoProgress" max="100" value="0" hidden></progress>
+            <span id="videoStatus" style="color:#8aa;"></span>
+            <video id="videoOutput" controls
+              style="width:100%; margin-top:10px; background:#000; border-radius:8px;"></video>
+
+          </div>
+
+          <div id="videoDownload" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Экран -->
+    <div class="grid panel tabpanel" id="panel-screen" style="display:none;">
+      <div class="panel">
+        <h2>Демонстрация экрана (только вывод)</h2>
+        <div class="row" style="gap:8px;">
+          <button id="btnStartScreen">Старт</button>
+          <button id="btnStopScreen">Стоп</button>
+        </div>
+
+        <!-- скрытый видео-источник и скрытый канвас для вырезки кадра -->
+        <video id="screenSrc" autoplay muted playsinline style="display:none;"></video>
+        <canvas id="screenSrcCnv" hidden></canvas>
+
+        <!-- видим только результат -->
+        <canvas id="screenDst" width="960" height="540"
+          style="margin-top:10px; background:#000; border-radius:10px;"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Параметры запуска</h2>
+        <div id="runParamsScreen" style="font-family:ui-monospace,monospace; font-size:13px; line-height:1.5"></div>
+        <button id="btnRefreshParamsScr" style="margin-top:8px;">Обновить</button>
+      </div>
+    </div>
+
+
+
+  </div>
+
+  <!-- Настройки -->
+  <dialog id="dlgSettings">
+    <form method="dialog">
+      <h3>Параметры инференса</h3>
+
+      <label>conf
+        <input type="number" id="pConf" min="0" max="1" step="0.01" value="0.35">
+        <small style="color:#788; display:block;">порог уверенности: выше → меньше ложных детекций</small>
+      </label>
+
+      <label>iou
+        <input type="number" id="pIou" min="0" max="1" step="0.01" value="0.45">
+        <small style="color:#788; display:block;">порог перекрытия для NMS: как сливать дублирующиеся боксы</small>
+      </label>
+
+      <label>imgsz
+        <input type="number" id="pImgsz" min="320" max="1536" step="32" value="640">
+        <small style="color:#788; display:block;">размер входного кадра: больше → точнее, но медленнее</small>
+      </label>
+
+      <label>task
+        <select id="pTask">
+          <option value="detect" selected>detect</option>
+          <option value="segment">segment</option>
+        </select>
+        <small style="color:#788; display:block;">режим инференса: детекция (боксы) или сегментация (маски)</small>
+      </label>
+
+      <label>модель (.pt)
+        <input type="text" id="pModel" value="best.pt" placeholder="например: yolov8n.pt">
+        <small style="color:#788; display:block;">путь к весам модели YOLOv8</small>
+      </label>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+        <button>Отмена</button>
+        <button id="btnSaveSettings" value="default">Сохранить</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <script>
+    // вкладки
+    document.querySelectorAll('.tab').forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tabpanel').forEach(x => x.style.display = 'none');
+        t.classList.add('active');
+        document.getElementById('panel-' + t.dataset.tab).style.display = 'grid';
+      }
+    });
+
+    // настройки (общие для всех вызовов API)
+    const settings = { conf: 0.25, iou: 0.70, imgsz: 640, task: 'detect', model: 'yolov8n.pt' };
+    const dlg = document.getElementById('dlgSettings');
+    document.getElementById('btnSettings').onclick = () => {
+      pConf.value = settings.conf; pIou.value = settings.iou; pImgsz.value = settings.imgsz;
+      pTask.value = settings.task; pModel.value = settings.model; dlg.showModal();
+    };
+    document.getElementById('btnSaveSettings').onclick = (e) => {
+      e.preventDefault();
+      settings.conf = +pConf.value; settings.iou = +pIou.value; settings.imgsz = +pImgsz.value;
+      settings.task = pTask.value; settings.model = pModel.value.trim(); dlg.close();
+    };
+
+    function renderRunParamsInto(el) {
+      if (!el) return;
+      el.innerHTML = [
+        `host: <b>localhost</b>`,
+        `port: <b>8000</b>`,
+        `model: <b>${settings.model || 'best.pt'}</b>`,
+        `task: <b>${settings.task}</b>`,
+        `conf: <b>${settings.conf}</b>`,
+        `iou: <b>${settings.iou}</b>`,
+        `imgsz: <b>${settings.imgsz}</b>`
+      ].map(x => `<div>${x}</div>`).join('');
+    }
+    function renderRunParamsAll() {
+      renderRunParamsInto(document.getElementById('runParamsImage'));
+      renderRunParamsInto(document.getElementById('runParamsVideo'));
+      renderRunParamsInto(document.getElementById('runParamsScreen'));
+    }
+    document.getElementById('btnRefreshParamsImg')?.addEventListener('click', renderRunParamsAll);
+    document.getElementById('btnRefreshParamsVid')?.addEventListener('click', renderRunParamsAll);
+    document.getElementById('btnSettings').addEventListener('click', renderRunParamsAll);
+    document.getElementById('btnSaveSettings').addEventListener('click', (e) => { e.preventDefault(); /* уже есть сохранение */ dlg.close(); renderRunParamsAll(); });
+    window.addEventListener('DOMContentLoaded', renderRunParamsAll);
+
+
+    // печать текущих настроек в консоль
+    function logSettings(prefix = "SETTINGS") {
+      console.log(`[${prefix}] model=${settings.model || 'yolov8n.pt'} task=${settings.task} conf=${settings.conf} iou=${settings.iou} imgsz=${settings.imgsz}`);
+    }
+
+    // сохраняем настройки из диалога
+    document.getElementById('btnSaveSettings').addEventListener('click', (e) => {
+      e.preventDefault();
+      settings.conf = +document.getElementById('pConf').value;
+      settings.iou = +document.getElementById('pIou').value;
+      settings.imgsz = +document.getElementById('pImgsz').value;
+      settings.task = document.getElementById('pTask').value;
+      settings.model = document.getElementById('pModel').value.trim();
+      logSettings('SAVE');
+      dlgSettings.close();
+      renderRunParamsAll?.();   // если у тебя есть эта функция — обновит панель справа
+    });
+
+    // логируем при старте любых операций
+    document.getElementById('btnDetectImg')?.addEventListener('click', () => logSettings('IMAGE'));
+    document.getElementById('btnProcessVideo')?.addEventListener('click', () => logSettings('VIDEO_FILE'));
+    document.getElementById('btnStartCam')?.addEventListener('click', () => logSettings('WEBCAM'));
+    document.getElementById('btnStartScreen')?.addEventListener('click', () => logSettings('SCREEN'));
+
+    // лог при загрузке страницы (видно текущие дефолты)
+    window.addEventListener('DOMContentLoaded', () => logSettings('BOOT'));
+
+
+
+
+
+    // === Фото ===
+    const imgEl = document.getElementById('imgPreview');
+    const canvas = document.getElementById('canvasImg');
+    const ctx = canvas.getContext('2d');
+    const fileImg = document.getElementById('fileImg');
+    const btnDetect = document.getElementById('btnDetectImg');
+    const btnClear = document.getElementById('btnClearImg');
+    const listImg = document.getElementById('listImg');
+    const apiUrlInput = document.getElementById('apiUrlImg');
+    let imgBlob = null;
+
+    function sizeCanvas() {
+      const w = imgEl.naturalWidth || imgEl.width;
+      const h = imgEl.naturalHeight || imgEl.height;
+      // Размеры самого элемента <img> и <canvas> делаем пиксель-в-пиксель:
+      imgEl.style.width = w + 'px';
+      imgEl.style.height = h + 'px';
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+
+    function drawBoxes(boxes) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2; ctx.font = "12px monospace";
+      boxes.forEach(b => {
+        ctx.strokeStyle = "lime";
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.fillStyle = "rgba(0,255,0,0.2)";
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        const txt = `${b.label || ''} ${(b.conf * 100).toFixed(1)}%`;
+        const tw = ctx.measureText(txt).width + 6;
+        ctx.fillStyle = "black"; ctx.fillRect(b.x, Math.max(0, b.y - 14), tw, 14);
+        ctx.fillStyle = "white"; ctx.fillText(txt, b.x + 3, Math.max(10, b.y - 3));
+      });
+    }
+
+
+
+    fileImg.onchange = () => {
+      const f = fileImg.files[0]; if (!f) return;
+      imgBlob = f; imgEl.src = URL.createObjectURL(f);
+      imgEl.onload = () => { sizeCanvas(); drawBoxes([]); btnDetect.disabled = false; }
+    };
+    btnClear.onclick = () => {
+      imgEl.removeAttribute('src'); imgBlob = null; ctx.clearRect(0, 0, canvas.width, canvas.height);
+      listImg.innerHTML = ''; fileImg.value = ''; btnDetect.disabled = true;
+    };
+    btnDetect.onclick = async () => {
+      if (!imgBlob) return;
+      const fd = new FormData();
+      fd.append('file', imgBlob);
+      fd.append('conf', settings.conf);
+      fd.append('iou', settings.iou);
+      fd.append('imgsz', settings.imgsz);
+      fd.append('task', settings.task);
+      fd.append('model', settings.model);
+      // можно попросить сервер вернуть отрисованное изображение:
+      // fd.append('return_image', 1);
+
+      const api = apiUrlInput.value || '/api/yolo/detect';
+      const r = await fetch(api, { method: 'POST', body: fd });
+      const j = await r.json();
+      sizeCanvas(); drawBoxes(j.boxes || []);
+      listImg.innerHTML = (j.boxes || []).map(b => `${b.label} ${Math.round(b.conf * 100)}%`).join("<br>");
+    };
+
+    // === Видео: файл ===
+    const videoFile = document.getElementById('videoFile');
+    const btnProcessVideo = document.getElementById('btnProcessVideo');
+    const videoOutput = document.getElementById('videoOutput');
+    const videoDownloadBox = document.getElementById('videoDownload');
+    const videoProgress = document.getElementById('videoProgress');
+    const videoStatus = document.getElementById('videoStatus');
+
+    btnProcessVideo.onclick = async () => {
+      const vf = videoFile.files[0];
+      if (!vf) return alert('Выберите видео');
+
+      // UI состояние
+      videoProgress.hidden = false; videoProgress.value = 10;
+      videoStatus.textContent = 'Обработка...';
+      videoOutput.removeAttribute('src'); videoOutput.load();
+      videoDownloadBox.innerHTML = '';
+
+      // формируем запрос
+      const fd = new FormData();
+      fd.append('video', vf);
+      fd.append('conf', settings.conf);
+      fd.append('iou', settings.iou);
+      fd.append('imgsz', settings.imgsz);
+      fd.append('task', settings.task);
+      fd.append('model', settings.model);
+
+      try {
+        const r = await fetch('/api/yolo/video', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+
+        // получаем размеченный mp4
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+
+        // показываем в плеере
+        videoOutput.src = url;
+        videoOutput.load();
+        videoOutput.play().catch(() => { });
+
+        // и ссылка на скачивание
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'detect.mp4';
+        a.textContent = '⬇️ Скачать detect.mp4';
+        videoDownloadBox.innerHTML = '';
+        videoDownloadBox.appendChild(a);
+
+        videoProgress.value = 100;
+        videoStatus.textContent = 'Готово';
+        console.log(`[VIDEO_FILE] готово: ${Math.round(blob.size / 1024 / 1024 * 10) / 10} MB`);
+      } catch (e) {
+        console.error(e);
+        videoStatus.textContent = 'Ошибка';
+        alert('Ошибка обработки видео');
+      } finally {
+        setTimeout(() => { videoProgress.hidden = true; }, 500);
+      }
+    };
+
+
+    // === Видео: веб-камера (псевдореалтайм) ===
+    const cam = document.getElementById('cam');
+    const camCanvas = document.getElementById('camCanvas');
+    const cctx = camCanvas.getContext('2d');
+    let camTimer = null;
+
+    document.getElementById('btnCamStart').onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      cam.srcObject = stream;
+      camTimer = setInterval(async () => {
+        cctx.drawImage(cam, 0, 0, camCanvas.width, camCanvas.height);
+        const blob = await new Promise(res => camCanvas.toBlob(res, 'image/jpeg', 0.8));
+        const fd = new FormData();
+        fd.append('image', blob, 'frame.jpg');
+        fd.append('conf', settings.conf);
+        fd.append('iou', settings.iou);
+        fd.append('imgsz', settings.imgsz);
+        fd.append('task', settings.task);
+        fd.append('model', settings.model);
+        const r = await fetch('/api/yolo/stream', { method: 'POST', body: fd });
+        if (!r.ok) return;
+        const data = await r.json();
+        // отрисовка
+        cctx.drawImage(cam, 0, 0, camCanvas.width, camCanvas.height);
+        (data.boxes || []).forEach(b => {
+          const [x1, y1, x2, y2] = b.xyxy;
+          cctx.strokeStyle = '#00E676'; cctx.lineWidth = 2;
+          cctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+          const label = `${b.cls} ${b.conf.toFixed(2)}`;
+          const tw = cctx.measureText(label).width + 6;
+          cctx.fillStyle = 'rgba(0,230,118,0.2)'; cctx.fillRect(x1, y1 - 18, tw, 18);
+          cctx.fillStyle = '#000'; cctx.font = '12px system-ui'; cctx.fillText(label, x1 + 3, y1 - 5);
+        });
+      }, 200);
+    };
+
+    document.getElementById('btnCamStop').onclick = () => {
+      if (camTimer) clearInterval(camTimer), camTimer = null;
+      const s = cam.srcObject; if (s) s.getTracks().forEach(t => t.stop());
+      cam.srcObject = null; cctx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+    };
+
+    // === Экран: только вывод на dstCnv ===
+    const scrVideo = document.getElementById('screenSrc');     // скрытый источник
+    const scrSrcCnv = document.getElementById('screenSrcCnv');  // скрытый канвас для вырезки кадра
+    const scrDstCnv = document.getElementById('screenDst');     // видимый канвас с результатом
+    const sctxSrc = scrSrcCnv.getContext('2d');
+    const sctxDst = scrDstCnv.getContext('2d');
+    let scrTimer = null;
+
+    document.getElementById('btnRefreshParamsScr')?.addEventListener('click', renderRunParamsAll);
+
+    document.getElementById('btnStartScreen').onclick = async () => {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      scrVideo.srcObject = stream;
+
+      // дождёмся метаданных, чтобы знать размер кадра
+      await scrVideo.play().catch(() => { });
+      const vw = scrVideo.videoWidth || 1280;
+      const vh = scrVideo.videoHeight || 720;
+
+      // масштабируем источник под лимит ~1280 по длинной стороне (меньше трафик)
+      const target = 1280;
+      const scale = Math.min(1, target / Math.max(vw, vh));
+      scrSrcCnv.width = Math.round(vw * scale);
+      scrSrcCnv.height = Math.round(vh * scale);
+
+      // при желании подогнать выходной канвас (оставь, если нужен фиксированный 960x540)
+      // scrDstCnv.width  = scrSrcCnv.width;
+      // scrDstCnv.height = scrSrcCnv.height;
+
+      const period = 100; // ~10 FPS
+      scrTimer = setInterval(captureSendAndDraw, period);
+    };
+
+    document.getElementById('btnStopScreen').onclick = () => {
+      if (scrTimer) { clearInterval(scrTimer); scrTimer = null; }
+      const s = scrVideo.srcObject;
+      if (s) s.getTracks().forEach(t => t.stop());
+      scrVideo.srcObject = null;
+      sctxDst.clearRect(0, 0, scrDstCnv.width, scrDstCnv.height);
+    };
+
+    async function captureSendAndDraw() {
+      if (!scrVideo.videoWidth || !scrVideo.videoHeight) return;
+
+      // 1) рисуем текущий кадр в скрытый канвас (источник)
+      sctxSrc.drawImage(scrVideo, 0, 0, scrSrcCnv.width, scrSrcCnv.height);
+
+      // 2) превращаем в JPEG blob и шлём на API (просим вернуть annotated кадр)
+      const blob = await new Promise(res => scrSrcCnv.toBlob(res, 'image/jpeg', 0.82));
+      if (!blob) return;
+
+      const fd = new FormData();
+      fd.append('image', blob, 'frame.jpg');
+      fd.append('conf', settings.conf);
+      fd.append('iou', settings.iou);
+      fd.append('imgsz', settings.imgsz);
+      fd.append('task', settings.task);
+      fd.append('model', settings.model);
+      fd.append('return_image', '1'); // ВАЖНО: просим annotated image
+
+      try {
+        const r = await fetch('/api/yolo/stream', { method: 'POST', body: fd });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!j.image_base64) return;
+
+        // 3) рисуем annotated кадр на видимом канвасе
+        const img = new Image();
+        img.onload = () => {
+          // вписываем картинку в dst-канвас по размеру канваса
+          sctxDst.clearRect(0, 0, scrDstCnv.width, scrDstCnv.height);
+          sctxDst.drawImage(img, 0, 0, scrDstCnv.width, scrDstCnv.height);
+        };
+        img.src = 'data:image/jpeg;base64,' + j.image_base64;
+      } catch (e) {
+        // молча игнорим редкие ошибки сети, чтобы не засыпать консоль
+      }
+    }
+
+
+  </script>
+</body>
+
+</html>

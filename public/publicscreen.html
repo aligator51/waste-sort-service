@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Демонстрация экрана → YOLOv8-Det</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; }
+    .row { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; }
+    label { display:block; margin:8px 0 4px; font-weight:600; }
+    input, select, button { padding:8px; }
+    button { font-weight:600; cursor:pointer; }
+    .pane { display:flex; gap:16px; flex-wrap:wrap; margin-top:16px; }
+    video, img, canvas { max-width: min(560px, 100%); background:#000; border-radius:8px; }
+    #log { margin-top:12px; background:#f6f8fa; padding:12px; border-radius:8px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .muted { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>Демонстрация экрана → YOLOv8-Det</h1>
+  <p class="muted">Браузер запросит выбор окна/экрана. Работает на <b>https</b> или <b>localhost</b> (Chrome/Edge/Firefox).</p>
+
+  <div class="row">
+    <div>
+      <label for="conf">conf</label>
+      <input id="conf" type="number" step="0.01" min="0" max="1" value="0.25" />
+    </div>
+    <div>
+      <label for="iou">iou</label>
+      <input id="iou" type="number" step="0.01" min="0" max="1" value="0.45" />
+    </div>
+    <div>
+      <label for="imgsz">imgsz</label>
+      <select id="imgsz">
+        <option>640</option>
+        <option>512</option>
+        <option>416</option>
+        <option>320</option>
+      </select>
+    </div>
+    <div>
+      <label for="fps">кадров/сек</label>
+      <select id="fps">
+        <option>5</option>
+        <option selected>10</option>
+        <option>15</option>
+        <option>25</option>
+      </select>
+    </div>
+    <div>
+      <label for="model">model (опц.)</label>
+      <input id="model" type="text" placeholder="путь к .pt (если нужен)" />
+    </div>
+    <div>
+      <button id="start">Старт (захват экрана)</button>
+      <button id="stop" disabled>Стоп</button>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div>
+      <div class="muted">Исходный поток (экран)</div>
+      <video id="src" autoplay muted playsinline></video>
+    </div>
+    <div>
+      <div class="muted">Результат YOLO (размеченный кадр)</div>
+      <img id="dst" alt="annotated frame" />
+    </div>
+  </div>
+
+  <!-- скрытый canvas для вырезки кадров -->
+  <canvas id="cnv" hidden></canvas>
+
+  <div id="log"></div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const log = m => { $("#log").textContent = (new Date()).toLocaleTimeString() + "  " + m + "\n" + $("#log").textContent; };
+
+    let mediaStream = null;
+    let timer = null;
+
+    async function startCapture() {
+      try {
+        mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        $("#src").srcObject = mediaStream;
+        $("#start").disabled = true;
+        $("#stop").disabled = false;
+
+        const fps = +$("#fps").value;
+        const period = Math.max(40, Math.round(1000 / fps));
+
+        // ждём, пока видео начнёт играть
+        await $("#src").play().catch(()=>{});
+        timer = setInterval(captureAndSend, period);
+        log("Захват экрана начат, интервал=" + period + "мс");
+      } catch (e) {
+        log("Ошибка захвата: " + e.message);
+        console.error(e);
+      }
+    }
+
+    function stopCapture() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      $("#start").disabled = false;
+      $("#stop").disabled = true;
+      log("Захват экрана остановлен");
+    }
+
+    async function captureAndSend() {
+      const video = $("#src");
+      if (!video.videoWidth || !video.videoHeight) return;
+
+      // рендерим текущий кадр экрана на canvas
+      const cnv = $("#cnv");
+      const target = 1280; // чуть уменьшим кадр перед отправкой
+      const scale = Math.min(1, target / Math.max(video.videoWidth, video.videoHeight));
+      cnv.width = Math.round(video.videoWidth * scale);
+      cnv.height = Math.round(video.videoHeight * scale);
+      const ctx = cnv.getContext("2d");
+      ctx.drawImage(video, 0, 0, cnv.width, cnv.height);
+
+      // в JPEG Blob (экономим трафик)
+      const blob = await new Promise(res => cnv.toBlob(res, "image/jpeg", 0.85));
+      if (!blob) return;
+
+      // собираем форму
+      const fd = new FormData();
+      fd.append("image", blob, "frame.jpg");
+      fd.append("conf", $("#conf").value);
+      fd.append("iou", $("#iou").value);
+      fd.append("imgsz", $("#imgsz").value);
+      fd.append("model", $("#model").value);
+      fd.append("return_image", "1");
+
+      try {
+        const resp = await fetch("/api/yolo/stream", { method: "POST", body: fd });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const json = await resp.json();
+        if (json.image_base64) {
+          $("#dst").src = "data:image/jpeg;base64," + json.image_base64;
+        }
+      } catch (e) {
+        // не спамим логом каждую ошибку, но покажем первое
+        console.error(e);
+      }
+    }
+
+    $("#start").addEventListener("click", startCapture);
+    $("#stop").addEventListener("click", stopCapture);
+
+    // авто-стоп при закрытии
+    window.addEventListener("beforeunload", stopCapture);
+  </script>
+</body>
+</html>
