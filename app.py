@@ -51,14 +51,26 @@ def detect_help():
     return JSONResponse({"hint": "POST multipart/form-data to /api/yolo/detect: file(image), conf(0..1), iou(0..1), imgsz(int), task(detect|segment), model(path). "})
 
 # === Модель по умолчанию ===
-default_model = YOLO(str(MODEL_PATH)).to("cpu")
+
+# Автоматическое определение устройства:
+# GPU (cuda:0) → если доступно (RTX 50xx, sm_120)
+# CPU → если CUDA нет
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+print("Using device:", DEVICE)
+
+# Загружаем модель на нужное устройство
+default_model = YOLO(str(MODEL_PATH)).to(DEVICE)
 _model_cache = {}  # (path) -> YOLO
+
 
 def get_model(path: str) -> YOLO:
     path = path.strip() if path else str(MODEL_PATH)
     full = str((BASE_DIR / path)) if not os.path.isabs(path) else path
+
     if full not in _model_cache:
-        _model_cache[full] = YOLO(full).to("cpu")
+        print(f"Loading model: {full} → {DEVICE}")
+        _model_cache[full] = YOLO(full).to(DEVICE)
+
     return _model_cache[full]
 
 
