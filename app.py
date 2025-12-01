@@ -24,8 +24,8 @@ from ultralytics import YOLO
 
 # === Настройки ===
 BASE_DIR = Path(__file__).parent.resolve()
-PUBLIC_DIR = BASE_DIR / "public"
-MODEL_PATH = BASE_DIR / "best.pt"  # можно заменить на best.pt
+PUBLIC_DIR = BASE_DIR / "public"   # папка с html
+MODEL_PATH = BASE_DIR / "best.pt"  # фаил с весами
 
 print("Serving UI from:", PUBLIC_DIR)
 print("Model path:", MODEL_PATH)
@@ -118,7 +118,7 @@ async def detect(
     w, h = image.size
 
     m = get_model(model) if model else default_model
-    log_infer_params("DETECT", conf, iou, imgsz, model)
+    log_infer_params("DETECT", conf, iou, imgsz, model) # -> detect
 
     t0 = perf_counter()
     res = m.predict(source=image, conf=conf, iou=iou, imgsz=imgsz, verbose=False)[0]
@@ -168,7 +168,7 @@ async def stream(
     return_image: int = Form(1),  # 1 — вернём размеченный кадр base64
 ):
     m = get_model(model) if model else default_model
-    log_infer_params("STREAM", conf, iou, imgsz, model)
+    log_infer_params("STREAM", conf, iou, imgsz, model) # -> stream
 
     data = np.frombuffer(await image.read(), np.uint8)
     frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
@@ -209,7 +209,7 @@ async def video(
     max_frames: int = Form(300),   # ограничение (важно)
 ):
     m = get_model(model) if model else default_model
-    log_infer_params("VIDEO", conf, iou, imgsz, model)
+    log_infer_params("VIDEO", conf, iou, imgsz, model) # -> video
 
     raw = await video.read()
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
