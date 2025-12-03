@@ -1,5 +1,6 @@
 # app.py
 
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -145,7 +146,7 @@ async def detect(
 
     if return_image:
         plotted = res.plot()
-        ok, buf = cv2.imencode(".jpg", plotted[:, :, ::-1] if plotted.ndim == 3 else plotted)
+        ok, buf = cv2.cvtColor(plotted, cv2.COLOR_RGB2BGR)
         b64 = base64.b64encode(buf.tobytes()).decode("ascii")
         # универсально для pydantic v1/v2
         try:
@@ -191,7 +192,7 @@ async def stream(
     payload = {"boxes": boxes, "conf_used": float(conf), "iou_used": float(iou)}
     if return_image:
         plotted = res.plot()  # RGB
-        ok, buf = cv2.imencode(".jpg", plotted[:, :, ::-1])  # -> BGR для imencode
+        ok, buf = cv2.imencode(".jpg", plotted[:, :, ::-1])
         b64 = base64.b64encode(buf.tobytes()).decode("ascii")
         payload["image_base64"] = b64
 
@@ -272,8 +273,8 @@ def print_startup_info():
 print_startup_info()
 
 
-# печать маршрутов как у тебя ...
 
 if __name__ == "__main__":
     import uvicorn
+    # Запуск:  uvicorn app:app --reload --host 0.0.0.0 --port 8000
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

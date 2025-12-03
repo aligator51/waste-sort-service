@@ -1,4 +1,5 @@
-# app.py — минимальный бэкенд для фронта из предыдущего файла
+# web.py
+# Минимальный бэкенд для фронта
 # FastAPI + Ultralytics YOLOv8. Отдаёт боксы в формате {x,y,w,h,conf,label} в пикселях исходного изображения.
 
 from fastapi import FastAPI, UploadFile, File, Form
@@ -9,10 +10,10 @@ from PIL import Image
 import io
 import uvicorn
 
-# 1) Загрузите модель один раз при старте
-#    положите свой .pt рядом и укажите путь ниже
+# 1) Загрузка модели  при старте
+#    положите свой .pt в папку и укажите путь ниже
 from ultralytics import YOLO
-MODEL_PATH = "best.pt"  # <= замените на вашу обученную модель
+MODEL_PATH = "last.pt"  # <= ваш .pt
 model = YOLO(MODEL_PATH)
 
 app = FastAPI(title="YOLOv8 API")
@@ -20,7 +21,7 @@ app = FastAPI(title="YOLOv8 API")
 # Разрешим фронту обращаться (локально)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # при желании ограничьте доменом
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,7 +51,7 @@ async def detect(file: UploadFile = File(...), conf: float = Form(0.5)):
     content = await file.read()
     image = Image.open(io.BytesIO(content)).convert("RGB")
 
-    # Запуск модели; вернём боксы в пикселях исходника
+    # Запуск модели; возвращает боксы в пикселях исходника
     results = model.predict(source=image, conf=conf, verbose=False)[0]
     w, h = image.size
 

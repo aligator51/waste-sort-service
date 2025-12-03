@@ -249,7 +249,7 @@
       </label>
 
       <label>модель (.pt)
-        <input type="text" id="pModel" value="best.pt" placeholder="например: yolov8n.pt">
+        <input type="text" id="pModel" value="last.pt" placeholder="например: last.pt">
         <small style="color:#788; display:block;">путь к весам модели YOLOv8</small>
       </label>
 
@@ -273,7 +273,7 @@
     });
 
     // настройки (общие для всех вызовов API)
-    const settings = { conf: 0.25, iou: 0.70, imgsz: 640, task: 'detect', model: 'yolov8n.pt' };
+    const settings = { conf: 0.25, iou: 0.70, imgsz: 640, task: 'detect', model: 'last.pt' };
     const dlg = document.getElementById('dlgSettings');
     document.getElementById('btnSettings').onclick = () => {
       pConf.value = settings.conf; pIou.value = settings.iou; pImgsz.value = settings.imgsz;
@@ -290,7 +290,7 @@
       el.innerHTML = [
         `host: <b>localhost</b>`,
         `port: <b>8000</b>`,
-        `model: <b>${settings.model || 'best.pt'}</b>`,
+        `model: <b>${settings.model || 'last.pt'}</b>`,
         `task: <b>${settings.task}</b>`,
         `conf: <b>${settings.conf}</b>`,
         `iou: <b>${settings.iou}</b>`,
@@ -311,7 +311,7 @@
 
     // печать текущих настроек в консоль
     function logSettings(prefix = "SETTINGS") {
-      console.log(`[${prefix}] model=${settings.model || 'yolov8n.pt'} task=${settings.task} conf=${settings.conf} iou=${settings.iou} imgsz=${settings.imgsz}`);
+      console.log(`[${prefix}] model=${settings.model || 'last.pt'} task=${settings.task} conf=${settings.conf} iou=${settings.iou} imgsz=${settings.imgsz}`);
     }
 
     // сохраняем настройки из диалога
